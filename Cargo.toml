@@ -1,0 +1,32 @@
+[package]
+name = "mll-axum-utils"
+version = "0.1.0"
+edition = "2021"
+authors = ["mll"]
+description = "一个 Axum 的工具库"
+license = "MIT OR Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0.160", features = ["derive"] }
+serde_json = "1.0.96"
+
+axum = { version = "0.6.1", features = ["headers"] }
+tower = { version = "0.4.1" }
+jsonwebtoken = { version = "8.3.0" }
+validator = { version = "0.16.0", features = ["derive"] }
+bytes = "1.4.0"
+serde_urlencoded = "0.7.1"
+
+tokio = { version = "1.28.0", features = ["full"] }
+futures-util = "0.3.28"
+
+# 字体颜色库
+colored = "2.0.0"
+# 时间库
+chrono = "0.4.24"
+# URI 编码库
+percent-encoding = "2.2.0"
+# IP 地址查看库
+if-addrs = "0.10.1"
