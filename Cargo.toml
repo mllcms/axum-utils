@@ -1,10 +1,11 @@
 [package]
 name = "mll-axum-utils"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 authors = ["mll"]
 description = "一个 Axum 的工具库"
 license = "MIT OR Apache-2.0"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,6 +23,7 @@ serde_urlencoded = "0.7.1"
 tokio = { version = "1.28.0", features = ["full"] }
 futures-util = "0.3.28"
 
+once_cell = "1.17.1"
 # 字体颜色库
 colored = "2.0.0"
 # 时间库

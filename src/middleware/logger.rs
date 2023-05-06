@@ -1,8 +1,7 @@
 use std::{
-    fs::{self, File},
+    fs::File,
     io::Write,
     net::SocketAddr,
-    path::Path,
     sync::mpsc::{channel, Sender},
     task::{Context, Poll},
 };
@@ -12,6 +11,8 @@ use chrono::{DateTime, Local};
 use colored::Colorize;
 use futures_util::future::BoxFuture;
 use tower::{Layer, Service};
+
+use crate::utils::create_log_file;
 
 /// # Examples
 /// ```no_run
@@ -34,16 +35,13 @@ pub struct Logger {
 impl Logger {
     /// # Examples
     /// ```no_run
-    /// Logger::new("logs/%Y-%m-%d.log", true, true);
+    /// Logger::new("logs/access/%Y-%m-%d.log", true, true);
     /// ```
     pub fn new(format: &str, stdout: bool, file_out: bool) -> Self {
         let mut time = Local::now();
 
         let mut file = file_out.then(|| {
             let path = time.format(format).to_string();
-            if let Some(p) = Path::new(&path).parent() {
-                fs::create_dir_all(p).expect("自动创建日志文件父级目录失败")
-            }
             create_log_file(path)
         });
 
@@ -51,30 +49,21 @@ impl Logger {
         // 单独线程 同步写入日志
         let format = format.to_string();
         tokio::spawn(async move {
-            for item in rx {
+            for msg in rx {
                 if stdout {
-                    item.stdout()
+                    msg.stdout()
                 }
 
                 if let Some(file) = file.as_mut() {
-                    if time.date_naive() != item.begin.date_naive() {
-                        time = item.begin;
+                    // 切换日志文件
+                    if time.date_naive() != msg.begin.date_naive() {
+                        time = msg.begin;
                         *file = create_log_file(time.format(&format).to_string())
                     }
-                    item.file_out(file)
+                    msg.file_out(file)
                 }
             }
         });
-
-        #[inline]
-        fn create_log_file(path: String) -> File {
-            File::options()
-                .create(true)
-                .append(true)
-                .write(true)
-                .open(path)
-                .expect("日志文件创建失败")
-        }
 
         Self { sender }
     }
@@ -82,7 +71,7 @@ impl Logger {
 
 impl Default for Logger {
     fn default() -> Self {
-        Self::new("logs/%Y-%m-%d.log", true, true)
+        Self::new("logs/access/%Y-%m-%d.log", true, true)
     }
 }
 
@@ -169,14 +158,24 @@ impl LogMsg {
             4 | 5 => format!(" {} ", self.status).on_red(),
             _ => format!(" {} ", self.status).on_yellow(),
         };
+
+        let method = match self.method.as_str() {
+            "GET" | "POST" => format!(" {:<6} ", self.method).on_blue(),
+            "DELETE" => format!(" {:<6} ", self.method).on_red(),
+            _ => format!(" {:<6} ", self.method).on_yellow(),
+        };
+
         println!(
-            "{} {} |{}| {:>6} | {:>15} | {:<5} {} {}",
+            "[{}] {} |{}| {:>6} | {:>15} |{} {} {}",
+            self.begin
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+                .truecolor(127, 132, 142),
             self.logo.bold().yellow(),
-            self.begin.format("%Y-%m-%d %H:%M:%S"),
             status,
             format!("{}ms", (self.end - self.begin).num_milliseconds()),
-            self.ip,
-            self.method,
+            self.ip.yellow(),
+            method,
             self.path,
             self.other
         );
@@ -184,9 +183,9 @@ impl LogMsg {
 
     fn file_out(&self, file: &mut File) {
         let msg = format!(
-            "{} {} | {} | {:>6} | {:>15} | {:<5} {} {}\n",
-            self.logo,
+            "[{}] {} | {} | {:>6} | {:>15} | {:<6} {} {}\n",
             self.begin.format("%Y-%m-%d %H:%M:%S"),
+            self.logo,
             self.status,
             format!("{}ms", (self.end - self.begin).num_milliseconds()),
             self.ip,

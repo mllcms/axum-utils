@@ -27,24 +27,24 @@ use crate::res::Res;
 ///         .route("/login", post(login))
 ///         .layer(JwtAuth::<Claims>::new(vec!["/login"]))
 ///         .layer(Logger::default());
-/// 
+///
 ///     axum::Server::bind(&addr.parse().unwrap())
 ///         .serve(app.into_make_service_with_connect_info::<SocketAddr>())
 ///         .await
 ///         .unwrap();
 /// }
-/// 
-/// async fn login(Json(user): Json<User>) -> Result<Res<String>, Res<()>> {
+///
+/// async fn login(Json(user): Json<User>) -> utils::Result<String> {
 ///     let token = Claims::new(user).encode()?;
 ///     // some validation
 ///     Ok(Res::success("登录成功", token))
 /// }
-/// 
+///
 /// async fn index(Extension(token): Extension<Claims>) -> &'static str {
 ///     println!("{:?}", token);
 ///     "身份认证成功 允许访问"
 /// }
-/// 
+///
 /// #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 /// struct User {
 ///     uid: u64,

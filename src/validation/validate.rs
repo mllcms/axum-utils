@@ -15,7 +15,7 @@ use crate::res::Res;
 /// 提取 Json 类型数据 并验证数据
 #[must_use]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct VJson<T>(pub T);
+pub struct VJson<T: Validate>(pub T);
 
 #[async_trait]
 impl<T, S, B> FromRequest<S, B> for VJson<T>
@@ -66,7 +66,7 @@ pub fn json_content_type(headers: &HeaderMap) -> bool {
 /// 提取 Form 类型数据 并验证数据
 #[must_use]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct VForm<T>(pub T);
+pub struct VForm<T: Validate>(pub T);
 
 #[async_trait]
 impl<T, S, B> FromRequest<S, B> for VForm<T>
@@ -104,7 +104,7 @@ where
 /// 提取 Json 或者 Form 类型数据 并验证数据
 #[must_use]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct VJsonOrForm<T>(pub T);
+pub struct VJsonOrForm<T: Validate>(pub T);
 
 #[async_trait]
 impl<T, S, B> FromRequest<S, B> for VJsonOrForm<T>
@@ -149,9 +149,10 @@ where
     }
 }
 
+/// 提取 Query 类型数据 并验证数据
 #[must_use]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct VQuery<T>(pub T);
+pub struct VQuery<T: Validate>(pub T);
 #[async_trait]
 impl<T, S, B> FromRequest<S, B> for VQuery<T>
 where
