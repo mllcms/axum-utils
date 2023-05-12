@@ -6,19 +6,29 @@ use std::{
     task::{Context, Poll},
 };
 
-use axum::{body::Body, extract::ConnectInfo, http::Request, response::Response};
+use axum::{
+    body::Body,
+    extract::ConnectInfo,
+    http::{header::LOCATION, Request},
+    response::Response,
+};
 use chrono::{DateTime, Local};
 use colored::Colorize;
 use futures_util::future::BoxFuture;
+use percent_encoding::percent_decode;
 use tower::{Layer, Service};
 
 use crate::utils::create_log_file;
 
 /// # Examples
 /// ```no_run
+/// use axum::Router;
+/// use mll_axum_utils::middleware::logger::Logger;
+/// use std::net::SocketAddr;
+///
 /// #[tokio::main]
 /// async fn main() {
-///     let addr = "127.0.0.1:3000";
+/// let addr = "127.0.0.1:3000";
 ///     let app = Router::new().layer(Logger::default());
 ///
 ///     axum::Server::bind(&addr.parse().unwrap())
@@ -35,6 +45,7 @@ pub struct Logger {
 impl Logger {
     /// # Examples
     /// ```no_run
+    /// use mll_axum_utils::middleware::logger::Logger;
     /// Logger::new("logs/access/%Y-%m-%d.log", true, true);
     /// ```
     pub fn new(format: &str, stdout: bool, file_out: bool) -> Self {
@@ -106,19 +117,34 @@ where
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
+        // 开始时间
         let begin = Local::now();
+        // 请求方式
         let method = req.method().to_string();
+        // 连接 ip
         let ip = match req.extensions().get::<ConnectInfo<SocketAddr>>() {
             Some(v) => v.0.ip().to_string(),
             None => panic!("Axum service 未配置 ConnectInfo<SocketAddr>"),
         };
-        let path = req.uri().path().to_string();
+        // 请求路径 解码为 utf-8
+        let mut path = percent_decode(req.uri().path().as_bytes())
+            .decode_utf8_lossy()
+            .to_string();
+
         let sender = self.sender.clone();
         let future = self.inner.call(req);
 
         Box::pin(async move {
             let response: Self::Response = future.await?;
+            // 状态码
             let status = response.status().as_u16();
+            // 是否重定向
+            if let Some(p) = response.headers().get(LOCATION) {
+                path = format!(
+                    "{path} -> {}",
+                    percent_decode(p.as_bytes()).decode_utf8_lossy()
+                )
+            }
 
             let msg = LogMsg {
                 logo: "[AXUM]".into(),

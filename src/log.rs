@@ -4,12 +4,12 @@ use std::{
     io::Write,
     panic::Location,
     sync::mpsc::{channel, Sender},
-    thread::{self, JoinHandle},
 };
 
 use chrono::{DateTime, Local};
 use colored::{ColoredString, Colorize};
 use once_cell::sync::Lazy;
+use tokio::task::JoinHandle;
 
 use crate::utils::create_log_file;
 
@@ -62,9 +62,8 @@ impl Log {
     /// 修改日志配置
     /// # Examples
     /// ```no_run
-    /// Log::config(|c| {
-    ///     c.file_out = true;
-    /// });
+    /// use mll_axum_utils::log::Log;
+    /// Log::config(|c| { c.file_out = true });
     /// ```
     pub fn config(f: fn(&mut LogConfig)) {
         unsafe {
@@ -80,7 +79,7 @@ impl Log {
         let mut log_file = config.file_out.then(|| LogFile::new(&config, &time));
 
         let (sender, rx) = channel::<LogMsg>();
-        let executor = thread::spawn(move || {
+        let executor = tokio::spawn(async move {
             for log_msg in rx {
                 let now = Local::now();
 
@@ -128,7 +127,7 @@ pub struct LogConfig {
 
     /// debug 文件位置
     /// # Examples
-    /// "logs/debog/%Y-%m-%d.log"
+    /// "logs/debug/%Y-%m-%d.log"
     pub debug_dir: String,
 
     /// info 文件位置
@@ -225,10 +224,20 @@ impl Level {
 
 #[test]
 fn is_works() {
-    Log::config(|c| c.file_out = true);
-    Log::info("test");
-    Log::debug("test");
-    Log::warn("test");
-    Log::error("test");
-    for _ in 0..u32::MAX {}
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .thread_stack_size(3 * 1024 * 1024)
+        .enable_all()
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        Log::config(|c| c.file_out = true);
+        Log::info("test");
+        Log::debug("test");
+        Log::warn("test");
+        Log::error("test");
+        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        std::process::exit(0)
+    });
 }

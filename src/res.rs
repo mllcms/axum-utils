@@ -13,8 +13,8 @@ pub struct Res<T> {
 }
 
 impl<T> IntoResponse for Res<T>
-where
-    T: Serialize,
+    where
+        T: Serialize,
 {
     fn into_response(self) -> Response {
         let body = Full::from(serde_json::to_vec(&self).unwrap());
@@ -28,14 +28,14 @@ where
 }
 
 impl<T> Res<T>
-where
-    T: Serialize,
+    where
+        T: Serialize,
 {
     #[allow(dead_code)]
     pub fn new<C, M>(code: C, msg: M, data: Option<T>) -> Self
-    where
-        C: Into<u16>,
-        M: Into<String>,
+        where
+            C: Into<u16>,
+            M: Into<String>,
     {
         Self {
             code: code.into(),
@@ -57,8 +57,8 @@ where
     ///  成功 响应消息+数据
     #[allow(dead_code)]
     pub fn success<M>(msg: M, data: T) -> Self
-    where
-        M: Into<String>,
+        where
+            M: Into<String>,
     {
         Self {
             code: StatusCode::OK.as_u16(),
@@ -70,8 +70,8 @@ where
     ///  失败 响应消息
     #[allow(dead_code)]
     pub fn error<M>(msg: M) -> Self
-    where
-        M: Into<String>,
+        where
+            M: Into<String>,
     {
         Self {
             code: StatusCode::BAD_REQUEST.as_u16(),
@@ -83,9 +83,9 @@ where
     ///  失败 响应状态码+消息
     #[allow(dead_code)]
     pub fn failed<C, M>(code: C, msg: M) -> Self
-    where
-        C: Into<u16>,
-        M: Into<String>,
+        where
+            C: Into<u16>,
+            M: Into<String>,
     {
         Self {
             code: code.into(),
@@ -97,8 +97,8 @@ where
     ///  身份认证失败
     #[allow(dead_code)]
     pub fn auth<M>(msg: M) -> Self
-    where
-        M: Into<String>,
+        where
+            M: Into<String>,
     {
         let mut msg: String = msg.into();
         msg.is_empty().then(|| msg.push_str("身份认证失败"));
@@ -123,9 +123,9 @@ where
     /// 数据验证失败
     /// ## default: 数据验证失败
     #[allow(dead_code)]
-    pub fn validate_failed<M>(msg: M) -> Self
-    where
-        M: Into<String>,
+    pub fn validate_failed<M: Into<String>>(msg: M) -> Self
+        where
+            M: Into<String>,
     {
         let mut msg: String = msg.into();
         msg.is_empty().then(|| msg.push_str("数据验证失败"));
@@ -145,6 +145,21 @@ where
             code: StatusCode::UNPROCESSABLE_ENTITY.as_u16(),
             msg: "数据验证失败".into(),
             data: Some(data),
+        }
+    }
+
+    /// 服务拒绝
+    /// ### default msg: 拒绝访问
+    pub fn reject<M>(msg:M) -> Self
+        where
+            M: Into<String> {
+        let mut msg: String = msg.into();
+        msg.is_empty().then(|| msg.push_str("拒绝访问"));
+
+        Self {
+            code: StatusCode::FORBIDDEN.as_u16(),
+            msg,
+            data: None,
         }
     }
 }

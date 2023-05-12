@@ -1,8 +1,7 @@
-# 一个 Axum 工具库
-
 # Examples
 ```rust
 use std::net::SocketAddr;
+
 use axum::{
     routing::{get, post},
     Extension, Router,
@@ -19,19 +18,22 @@ use mll_axum_utils::{
 };
 use serde::{Deserialize, Serialize};
 use validator::Validate;
+use mll_axum_utils::middleware::interceptor;
 
 #[tokio::main]
 async fn main() {
     let addr = "0.0.0.0:3000".parse().unwrap();
     echo_ip_addrs(&addr);
-    Log::config(|c| {
-        c.file_out = true;
-    });
+    Log::config(|c| c.file_out = true);
 
     let app = Router::new()
         .route("/index", get(index))
         .route("/login", post(login))
+        // jwt 验证
         .layer(JwtAuth::<Claims>::new(vec!["/login"]))
+        // 拦截器拦截黑名单 ip 访问
+        .layer(interceptor::blacklist_ip(vec!["127.0.0.1"]))
+        // 访问日志记录
         .layer(Logger::default());
 
     axum::Server::bind(&addr)
@@ -55,6 +57,9 @@ async fn index(Extension(token): Extension<Claims>) -> &'static str {
 #[derive(Debug, Clone, Default, Validate, Serialize, Deserialize)]
 struct User {
     uid: u64,
+
+    // 数据验证
+    #[validate(length(min = 3, max = 24, message = "用户名长度必须在3-24之间"))]
     name: String,
 }
 
@@ -64,11 +69,15 @@ struct Claims {
     user: User,
 }
 
-impl JwtToken for Claims {}
+impl JwtToken for Claims {
+    const SECRET: &'static str = "new_key";
+    const DURATION: u64 = 60 * 60 * 24; // token 有效期持续 1 天
+}
+
 impl Claims {
     fn new(user: User) -> Self {
         Self {
-            exp: Self::duration(),
+            exp: Self::expiration(),
             user,
         }
     }

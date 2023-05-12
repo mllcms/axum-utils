@@ -19,9 +19,16 @@ use crate::res::Res;
 
 /// # Examples
 /// ```no_run
+/// use std::net::SocketAddr;
+/// use axum::{Router,Json,Extension};
+/// use axum::routing::{get, post};
+/// use mll_axum_utils::middleware::jwt::{JwtAuth,JwtToken};
+/// use mll_axum_utils::middleware::logger::Logger;
+/// use mll_axum_utils::{utils,res::Res};
+///
 /// #[tokio::main]
 /// async fn main() {
-///     let addr = "127.0.0.1:3000";
+/// let addr = "127.0.0.1:3000";
 ///     let app = Router::new()
 ///         .route("/index", get(index))
 ///         .route("/login", post(login))
@@ -35,7 +42,7 @@ use crate::res::Res;
 /// }
 ///
 /// async fn login(Json(user): Json<User>) -> utils::Result<String> {
-///     let token = Claims::new(user).encode()?;
+/// let token = Claims::new(user).encode()?;
 ///     // some validation
 ///     Ok(Res::success("登录成功", token))
 /// }
@@ -152,24 +159,28 @@ pub trait JwtToken
 where
     Self: Serialize + for<'a> Deserialize<'a>,
 {
+    /// token key
+    const SECRET: &'static str = "my_key";
+
+    /// token 持续时间 默认15天 单位 s
+    const DURATION: u64 = 60 * 60 * 24 * 15;
+
     /// token 编码
     fn encode(&self) -> Result<String, Res<()>> {
         let res = jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),
             self,
-            &EncodingKey::from_secret(Self::secret().as_bytes()),
+            &EncodingKey::from_secret(Self::SECRET.as_bytes()),
         );
-        match res {
-            Ok(res) => Ok(res),
-            Err(err) => Err(Res::error(err.to_string())),
-        }
+
+        res.map_err(|err| Res::error(err.to_string()))
     }
 
     /// token 解码
     fn decode(&self, token: &str) -> Result<Self, Res<()>> {
         let res = jsonwebtoken::decode::<Self>(
             token,
-            &DecodingKey::from_secret(Self::secret().as_bytes()),
+            &DecodingKey::from_secret(Self::SECRET.as_bytes()),
             &Validation::default(),
         );
         match res {
@@ -178,17 +189,12 @@ where
         }
     }
 
-    // token key
-    fn secret() -> &'static str {
-        "mykey"
-    }
-
-    // token 过期时间 默认15天
-    fn duration() -> u64 {
+    /// token 过期时间: 当前时间 + Self::DURATION
+    fn expiration() -> u64 {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        timestamp + 60 * 60 * 24 * 15
+        timestamp + Self::DURATION
     }
 }

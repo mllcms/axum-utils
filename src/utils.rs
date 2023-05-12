@@ -11,6 +11,9 @@ use std::result;
 #[allow(dead_code)]
 pub type Result<T> = result::Result<Res<T>, Res<()>>;
 
+#[allow(dead_code)]
+pub type Results<T,E> = result::Result<Res<T>, Res<E>>;
+
 /// 输出服务地址 针对于 0.0.0.0 这种
 #[allow(dead_code)]
 pub fn echo_ip_addrs(addr: &SocketAddr) {
@@ -29,7 +32,7 @@ pub fn echo_ip_addrs(addr: &SocketAddr) {
         println!(
             "{}",
             format!(
-                "Server runting at {}",
+                "Server running at {}",
                 format!("http://{}:{}/", ip, addr.port()).underline()
             )
             .purple()
