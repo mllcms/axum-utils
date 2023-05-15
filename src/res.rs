@@ -1,3 +1,5 @@
+use std::{fmt::Display, format};
+
 use axum::{
     body::{boxed, Full},
     http::StatusCode,
@@ -13,8 +15,8 @@ pub struct Res<T> {
 }
 
 impl<T> IntoResponse for Res<T>
-    where
-        T: Serialize,
+where
+    T: Serialize,
 {
     fn into_response(self) -> Response {
         let body = Full::from(serde_json::to_vec(&self).unwrap());
@@ -28,23 +30,49 @@ impl<T> IntoResponse for Res<T>
 }
 
 impl<T> Res<T>
-    where
-        T: Serialize,
+where
+    T: Serialize,
 {
     #[allow(dead_code)]
-    pub fn new<C, M>(code: C, msg: M, data: Option<T>) -> Self
-        where
-            C: Into<u16>,
-            M: Into<String>,
+    pub fn new<C, M>(code: C, msg: M) -> Self
+    where
+        C: Into<u16>,
+        M: Display,
     {
         Self {
             code: code.into(),
-            msg: msg.into(),
-            data,
+            msg: format!("{msg}"),
+            data: None,
         }
     }
 
-    ///  成功 响应数据
+    #[allow(dead_code)]
+    pub fn new_data<C, M>(code: C, msg: M, data: T) -> Self
+    where
+        C: Into<u16>,
+        M: Display,
+    {
+        Self {
+            code: code.into(),
+            msg: format!("{msg}"),
+            data: Some(data),
+        }
+    }
+
+    /// 201 创建资源成功
+    #[allow(dead_code)]
+    pub fn created<M>(msg: M) -> Self
+    where
+        M: Display,
+    {
+        Self {
+            code: StatusCode::CREATED.into(),
+            msg: format!("{msg}"),
+            data: None,
+        }
+    }
+
+    ///  200 成功 响应数据
     #[allow(dead_code)]
     pub fn ok(data: T) -> Self {
         Self {
@@ -54,53 +82,26 @@ impl<T> Res<T>
         }
     }
 
-    ///  成功 响应消息+数据
-    #[allow(dead_code)]
-    pub fn success<M>(msg: M, data: T) -> Self
-        where
-            M: Into<String>,
-    {
-        Self {
-            code: StatusCode::OK.as_u16(),
-            msg: msg.into(),
-            data: Some(data),
-        }
-    }
-
-    ///  失败 响应消息
+    ///  400 失败 响应消息
     #[allow(dead_code)]
     pub fn error<M>(msg: M) -> Self
-        where
-            M: Into<String>,
+    where
+        M: Display,
     {
         Self {
             code: StatusCode::BAD_REQUEST.as_u16(),
-            msg: msg.into(),
+            msg: format!("{msg}"),
             data: None,
         }
     }
 
-    ///  失败 响应状态码+消息
-    #[allow(dead_code)]
-    pub fn failed<C, M>(code: C, msg: M) -> Self
-        where
-            C: Into<u16>,
-            M: Into<String>,
-    {
-        Self {
-            code: code.into(),
-            msg: msg.into(),
-            data: None,
-        }
-    }
-
-    ///  身份认证失败
+    ///  401 身份认证失败
     #[allow(dead_code)]
     pub fn auth<M>(msg: M) -> Self
-        where
-            M: Into<String>,
+    where
+        M: Display,
     {
-        let mut msg: String = msg.into();
+        let mut msg: String = format!("{msg}");
         msg.is_empty().then(|| msg.push_str("身份认证失败"));
 
         Self {
@@ -110,7 +111,7 @@ impl<T> Res<T>
         }
     }
 
-    ///  权限不足
+    ///  401 权限不足
     #[allow(dead_code)]
     pub fn privilege() -> Self {
         Self {
@@ -120,14 +121,14 @@ impl<T> Res<T>
         }
     }
 
-    /// 数据验证失败
+    /// 422 数据验证失败
     /// ## default: 数据验证失败
     #[allow(dead_code)]
-    pub fn validate_failed<M: Into<String>>(msg: M) -> Self
-        where
-            M: Into<String>,
+    pub fn validate_failed<M: Display>(msg: M) -> Self
+    where
+        M: Display,
     {
-        let mut msg: String = msg.into();
+        let mut msg: String = format!("{msg}");
         msg.is_empty().then(|| msg.push_str("数据验证失败"));
 
         Self {
@@ -137,7 +138,7 @@ impl<T> Res<T>
         }
     }
 
-    /// 数据验证失败
+    /// 422 数据验证失败
     /// ### default msg: 数据验证失败
     #[allow(dead_code)]
     pub fn validate_failed_data(data: T) -> Self {
@@ -148,17 +149,30 @@ impl<T> Res<T>
         }
     }
 
-    /// 服务拒绝
+    /// 403 服务拒绝
     /// ### default msg: 拒绝访问
-    pub fn reject<M>(msg:M) -> Self
-        where
-            M: Into<String> {
-        let mut msg: String = msg.into();
+    pub fn reject<M>(msg: M) -> Self
+    where
+        M: Display,
+    {
+        let mut msg: String = format!("{msg}");
         msg.is_empty().then(|| msg.push_str("拒绝访问"));
 
         Self {
             code: StatusCode::FORBIDDEN.as_u16(),
             msg,
+            data: None,
+        }
+    }
+
+    /// 500 服务器内部错误
+    pub fn internal_error<M>(msg: M) -> Self
+    where
+        M: Display,
+    {
+        Self {
+            code: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+            msg: format!("{msg}"),
             data: None,
         }
     }

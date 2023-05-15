@@ -122,7 +122,7 @@ pub fn json_content_type(headers: &HeaderMap) -> bool {
 }
 
 /// 数据验证
-fn validate(data: impl Validate) -> Result<(), Res<Vec<String>>> {
+pub fn validate(data: impl Validate) -> Result<(), Res<Vec<String>>> {
     if let Err(err) = data.validate() {
         let mut err_data = Vec::new();
         for (k, v) in err.field_errors() {

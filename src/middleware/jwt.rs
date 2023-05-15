@@ -5,7 +5,9 @@ use std::{
 };
 
 use axum::{
+    async_trait,
     body::Body,
+    extract::FromRequest,
     headers::{authorization::Bearer, Authorization, HeaderMapExt},
     http::Request,
     response::{IntoResponse, Response},
@@ -16,6 +18,39 @@ use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 
 use crate::res::Res;
+
+/// 验证 toekn 并解析 token 携带的数据
+#[must_use]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Jwt<T: JwtToken + Default>(pub T);
+
+#[async_trait]
+impl<T, S, B> FromRequest<S, B> for Jwt<T>
+where
+    T: JwtToken + Default,
+    B: Send + 'static,
+    S: Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request(req: Request<B>, _state: &S) -> Result<Self, Self::Rejection> {
+        let claims = auth_token::<T, B>(&req)?;
+        Ok(Jwt(claims))
+    }
+}
+
+fn auth_token<T: JwtToken + Default, B>(req: &Request<B>) -> Result<T, Response> {
+    let auth = req
+        .headers()
+        .typed_get::<Authorization<Bearer>>()
+        .ok_or(Res::<()>::auth("请求未携带token").into_response())?;
+
+    let claims = T::default()
+        .decode(auth.token())
+        .map_err(|err| err.into_response())?;
+
+    Ok(claims)
+}
 
 /// # Examples
 /// ```no_run
@@ -108,6 +143,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct JwtAuthService<S, T> {
     inner: S,
@@ -117,7 +153,7 @@ pub struct JwtAuthService<S, T> {
 
 impl<S, T> Service<Request<Body>> for JwtAuthService<S, T>
 where
-    T: JwtToken + Sync + Send + 'static,
+    T: JwtToken + Default + Sync + Send + 'static,
     S: Service<Request<Body>, Response = Response> + Send + 'static,
     S::Future: Send + 'static,
 {
@@ -130,26 +166,23 @@ where
     }
 
     fn call(&mut self, mut req: Request<Body>) -> Self::Future {
-        if !self.filter.contains(&req.uri().path()) {
-            let auth = match req.headers().typed_get::<Authorization<Bearer>>() {
-                Some(v) => v,
-                None => {
-                    return Box::pin(async {
-                        Ok(Res::<()>::auth("请求未携带token").into_response())
-                    })
-                }
-            };
+        let mut response = None;
 
-            let claims = match self.claims.decode(auth.token()) {
-                Ok(v) => v,
-                Err(err) => return Box::pin(async { Ok(err.into_response()) }),
-            };
-            req.extensions_mut().insert(claims);
+        if !self.filter.contains(&req.uri().path()) {
+            match auth_token::<T, _>(&req) {
+                Ok(claims) => {
+                    req.extensions_mut().insert(claims);
+                }
+                Err(err_res) => response = Some(err_res),
+            }
         }
 
         let future = self.inner.call(req);
         Box::pin(async move {
-            let response: Response = future.await?;
+            let response = match response {
+                Some(v) => v,
+                None => future.await?,
+            };
             Ok(response)
         })
     }

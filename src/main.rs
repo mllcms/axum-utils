@@ -4,6 +4,7 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
+use mll_axum_utils::middleware::interceptor;
 use mll_axum_utils::{
     log::Log,
     middleware::{
@@ -12,11 +13,10 @@ use mll_axum_utils::{
     },
     res::Res,
     utils::{self, echo_ip_addrs},
-    validation::VJsonOrForm,
+    validator::VJsonOrForm,
 };
 use serde::{Deserialize, Serialize};
 use validator::Validate;
-use mll_axum_utils::middleware::interceptor;
 
 #[tokio::main]
 async fn main() {
